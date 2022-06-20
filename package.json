@@ -1,0 +1,21 @@
+{
+  "name": "wallter_tracter",
+  "version": "1.0.0",
+  "description": "tracking specific wallet",
+  "main": "main.js",
+  "dependencies": {
+    "axios": "^0.27.2",
+    "dotenv": "^16.0.1",
+    "es6-promise": "^4.2.8",
+    "ethers": "^5.6.9",
+    "fs": "0.0.1-security",
+    "open": "^8.4.0",
+    "web3": "^1.7.3"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "yiyao jian",
+  "license": "ISC"
+}
