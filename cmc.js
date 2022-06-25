@@ -12,7 +12,7 @@ require('dotenv').config();
 const fs = require('fs');
 const config = require('./config');
 const axios = require('axios').default;
-const Wallet = require('/Users/yiyaojian/Projects/wallter_tracter/wallet.js')
+const Wallet = require('./wallet.js')
 const addresses = {
     WBNB: '0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c',
     pancakeRouter: '0x10ED43C718714eb63d5aA57B78B54704E256024E',
@@ -21,16 +21,23 @@ const addresses = {
     recipient: process.env.recipient
 }
 const mnemonic = process.env.mnemonic;
+const mnemonic2 = process.env.mnemonic2;
 const node = process.env.node;
 const wallet = new ethers.Wallet(mnemonic);
+const sellWallet = new ethers.Wallet(mnemonic2);
+const seliing_address = '';
 const provider = new ethers.providers.JsonRpcProvider(node);
 const account = wallet.connect(provider);
+const selling_account = sellWallet.connect(provider)
+
+const sellrecipient = "0x146b3e8198ef0B16691154aB554255749712644B";
 const pancakeAbi = [
     'function getAmountsOut(uint amountIn, address[] calldata path) external view returns (uint[] memory amounts)',
     'function swapExactTokensForETHSupportingFeeOnTransferTokens(uint256 amountIn, uint256 amountOutMin, address[] path, address to, uint256 deadline)',
     'function swapExactTokensForETH(uint256 amountIn, uint256 amountOutMin, address[] path, address to, uint256 deadline)',
-    'function swapExactETHForTokens(uint amountOutMin, address[] calldata path, address to, uint deadline)'
+    'function swapExactETHForTokens( uint amountOutMin, address[] calldata path, address to, uint deadline) external payable returns (uint[] memory amounts)'
 ];
+const selling_pancakeRouter = new ethers.Contract(addresses.pancakeRouter, pancakeAbi, selling_account);
 const pancakeRouter = new ethers.Contract(addresses.pancakeRouter, pancakeAbi, account);
 let tokenAbi = [
     'function approve(address spender, uint amount) public returns(bool)',
@@ -51,6 +58,7 @@ const buyContract = new ethers.Contract(addresses.buyContract, tokenAbi, account
 // const CoinMarketCapCoinGeckoChannel = 1517585345;
 // const CoinmarketcapFastestAlertsChannel = 1519789792;
 var dontBuyTheseTokens;
+var nonce;
 
 /**
  * 
@@ -58,16 +66,30 @@ var dontBuyTheseTokens;
  * 
  * */
 async function buy() {
-    const value = ethers.utils.parseUnits(token[buyCount].investmentAmount, 'ether').toString();
-    const tx = await buyContract.buyTokens(token[buyCount].tokenAddress, addresses.recipient,
-        {
-            value: value,
-            gasPrice: token[buyCount].gasPrice,
-            gasLimit: config.myGasLimit
+    // const value = ethers.utils.parseUnits(token[buyCount].investmentAmount).toHexString();
+    const value = ethers.utils.parseUnits(config.strategyLL.investmentAmount, 'ether');
+    try {
+        const tx = await pancakeRouter.swapExactETHForTokens(
+            0,
+            [addresses.WBNB,token[buyCount].tokenAddress],
+            sellrecipient,
+            Math.floor(Date.now() / 1000) + 1200,{
+                gasPrice: config.myGasPriceForApproval,
+                gasLimit: config.myGasLimit,
+                value:value
+            }
+        )
+        
+        console.log(`finished bought  ${tokenName}, contract: ${contractAddress} at ${new Date().toLocaleString()}`);
+        const receipt = await tx.wait();
+        nonce = await provider.getTransactionCount(wallet.address)
 
-        });
-    const receipt = await tx.wait();
-    console.log("\u001b[1;32m" + "✔ Buy transaction hash: ", receipt.transactionHash, "\u001b[0m");
+        // console.log("\u001b[1;32m" + "✔ Buy transaction hash: ", receipt.transactionHash, "\u001b[0m");
+    }catch(e) {
+        console.log('error buying happens at', new Date().toLocaleString(),e);
+        process.exit();
+    }
+
     token[buyCount].didBuy = true;
     const poocoinURL = new URL(token[buyCount].tokenAddress, 'https://poocoin.app/tokens/');
     open(poocoinURL.href);
@@ -95,11 +117,10 @@ async function buy() {
  * 
  * */
 async function approve() {
-
-    let contract = token[buyCount - 1].contract;
+    let contract = token[buyCount - 1].sellContract;
     const valueToApprove = ethers.constants.MaxUint256;
     const tx = await contract.approve(
-        pancakeRouter.address,
+        selling_pancakeRouter.address,
         valueToApprove, {
         gasPrice: config.myGasPriceForApproval,
         gasLimit: 210000
@@ -125,8 +146,8 @@ async function approve() {
  * */
 async function getCurrentValue(token) {
     try {
-        let bal = await token.contract.balanceOf(addresses.recipient);
-        const amount = await pancakeRouter.getAmountsOut(bal, token.sellPath);
+        let bal = await token.contract.balanceOf(sellrecipient);
+        const amount = await selling_pancakeRouter.getAmountsOut(bal, token.sellPath);
         let currentValue = amount[1];
         return currentValue;
     }
@@ -185,9 +206,8 @@ async function checkForProfit(token) {
                 catch (e) {
 
                 }
-
                 if (currentValue.gte(profitDesired)) {
-                    if (buyCount <= config.numberOfTokensToBuy && token.didBuy && sellAttempts == 0) {
+                    if ( token.didBuy && sellAttempts == 0) {
                         sellAttempts++;
                         console.log("<<< Selling -", tokenName, "- now" + "\u001b[1;32m" + " Profit target " + "\u001b[0m" + "reached >>>", "\n");
                         sell(token, true);
@@ -218,7 +238,7 @@ async function checkForProfit(token) {
  * */
 async function sell(tokenObj, isProfit) {
     try {
-        const bal = await tokenObj.contract.balanceOf(addresses.recipient);
+        const bal = await tokenObj.contract.balanceOf(sellrecipient);
         const decimals = await tokenObj.contract.decimals();
         var balanceString;
         if (isProfit) {
@@ -228,10 +248,10 @@ async function sell(tokenObj, isProfit) {
         }
         var roundedBalance = Math.floor(balanceString * 100) / 100
         const balanceToSell = ethers.utils.parseUnits(roundedBalance.toString(), decimals);
-        const sellAmount = await pancakeRouter.getAmountsOut(balanceToSell, tokenObj.sellPath);
+        const sellAmount = await selling_pancakeRouter.getAmountsOut(balanceToSell, tokenObj.sellPath);
         const sellAmountsOutMin = sellAmount[1].sub(sellAmount[1].div(2));
         // if (tokenObj.tokenSellTax > 1) {
-        const tx = await pancakeRouter.swapExactTokensForETHSupportingFeeOnTransferTokens(
+        const tx = await selling_pancakeRouter.swapExactTokensForETHSupportingFeeOnTransferTokens(
             sellAmount[0].toString(),
             0,
             tokenObj.sellPath,
@@ -245,7 +265,7 @@ async function sell(tokenObj, isProfit) {
         const receipt = await tx.wait();
         console.log("\u001b[1;32m" + "✔ Sell transaction hash: ", receipt.transactionHash, "\u001b[0m", "\n");
         sellCount++;
-        token[tokenObj.index].didSell = true;
+        // token[tokenObj.index].didSell = true;
         // } else {
         //     const tx = await pancakeRouter.swapExactTokensForETH(
         //         sellAmount[0].toString(),
@@ -269,7 +289,7 @@ async function sell(tokenObj, isProfit) {
         }
 
     } catch (e) {
-
+        console.log(`${"\u001b[1;32m" + "error when selling" + "\u001b[0m"} --error: ${e} `);
     }
 }
 
@@ -297,15 +317,16 @@ function didNotBuy(address) {
     return true;
 }
 
-function onNewMessabge(address) {
+async function onNewMessabge(address) {
     // Buy low-liquid tokens
     token.push({
         tokenAddress: address,
         didBuy: false,
-        hasSold: false,
+        didSell: false,
         buyPath: [addresses.WBNB, address],
         sellPath: [address, addresses.WBNB],
         contract: new ethers.Contract(address, tokenAbi, account),
+        sellContract: new ethers.Contract(address, tokenAbi, selling_account),
         investmentAmount: config.strategyLL.investmentAmount,
         profitPercent: config.strategyLL.profitPercent,
         stopLossPercent: config.strategyLL.stopLossPercent,
@@ -321,25 +342,33 @@ function onNewMessabge(address) {
         previousValue: 0
     });
     console.log('<<< Attention! Buying token now! >>> Contract:', address);
-    buy();
+    await buy();
 }
 
 
 
 
 async function checkAddress(ws) {
+    if ( buyCount == config.numberOfTokensToBuy ) {
+        return
+    }
     for (w of ws) {
         try {
             const response = await axios.get(w.getApi());
             ({ to, tokenName, contractAddress } = response.data.result[0])
-            if (to != w.address) continue;
+            if (to.toLowerCase() != w.address.toLowerCase()) continue;
             if (didNotBuy(contractAddress)) {
                 if (!firstCall) {
-                    console.log('he bought new token', contractAddress)
-                    onNewMessabge(contractAddress)
                     console.log(`he bought a new token: ${tokenName}, contract: ${contractAddress} at ${new Date().toLocaleString()}`)
+                    dontBuyTheseTokens.push({
+                        address: contractAddress
+                    });
+                    await onNewMessabge(contractAddress)
                 } else {
                     console.log('first time call, ignore and save it')
+                    dontBuyTheseTokens.push({
+                        address: contractAddress
+                    })
                     fs.readFile('tokensBought.json', 'utf8', function readFileCallback(err, data) {
                         if (err) {
                             console.log('error read file tokensBought.json', err)
@@ -355,6 +384,7 @@ async function checkAddress(ws) {
                         }
                     });
                 }
+                
             }
         } catch (error) {
             console.error(error);
@@ -363,17 +393,23 @@ async function checkAddress(ws) {
     firstCall = false
 
 }
+function sleep(ms) {
+    return new Promise((resolve) => {
+      setTimeout(resolve, ms);
+    });
+  }
 
 //main
-var w1 = new Wallet('0xC94e9c7ECD937f706750FFEe835dD7907DE5cAc2');
-var w2 = new Wallet('0x8ABD5B4bb506e3c56777361be02AdafaBC3425a9');
-var w3 = new Wallet('0x362798e7De000A06C5894574Df55e493A4B4DD80');
-var n = 0;
+var w1 = new Wallet('0x8ABD5B4bb506e3c56777361be02AdafaBC3425a9');
+var w2 = new Wallet('');
+var w3 = new Wallet('');
+
 async function main() {
-    n += 1
-    console.log(n)
-    await checkAddress([w1, w2, w3]);
-    setTimeout(main, 1000)
+    while (true) {
+        await checkAddress([w1]);
+        await sleep(1000)
+    }
+    
 }
 
 
@@ -383,6 +419,7 @@ async function main() {
     let raw = await readFile('tokensBought.json');
     let tokensBought = JSON.parse(raw);
     dontBuyTheseTokens = tokensBought.tokens;
+    console.log("\u001b[1;32m" + "✔ program running.... ");
+    nonce = await provider.getTransactionCount(wallet.address);
     main()
 })();
-
