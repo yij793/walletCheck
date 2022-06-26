@@ -6,87 +6,87 @@ https://t.me/joinchat/b17jE6EbQX5kNWY8 use this link and subscribe.
 Turn on two step verification in telegram.
 Go to my.telegram.org and create App to get api_id and api_hash.
 */
-const ethers = require('ethers');
-const open = require('open');
+// const ethers = require('ethers');
+// const open = require('open');
 require('dotenv').config();
 const fs = require('fs');
-const config = require('./config');
-const axios = require('axios').default;
-const Wallet = require('./wallet.js')
-const addresses = {
-    WBNB: '0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c',
-    pancakeRouter: '0x10ED43C718714eb63d5aA57B78B54704E256024E',
-    BUSD: '0xe9e7cea3dedca5984780bafc599bd69add087d56',
-    buyContract: '0xDC56800e179964C3C00a73f73198976397389d26',
-    recipient: process.env.recipient
-}
-const mnemonic = process.env.mnemonic;
-const mnemonic2 = process.env.mnemonic2;
-const node = process.env.node;
-const wallet = new ethers.Wallet(mnemonic);
-const sellWallet = new ethers.Wallet(mnemonic2);
-const seliing_address = '';
-const provider = new ethers.providers.JsonRpcProvider(node);
-const account = wallet.connect(provider);
-const selling_account = sellWallet.connect(provider)
+// const config = require('./config');
+// const axios = require('axios').default;
+// const Wallet = require('./wallet.js');
+const Web3 = require('web3');
+// const addresses = {
+//     WBNB: '0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c',
+//     pancakeRouter: '0x10ED43C718714eb63d5aA57B78B54704E256024E',
+//     BUSD: '0xe9e7cea3dedca5984780bafc599bd69add087d56',
+//     buyContract: '0xDC56800e179964C3C00a73f73198976397389d26',
+//     recipient: process.env.recipient
+// }
+// const mnemonic = process.env.mnemonic;
+// const mnemonic2 = process.env.mnemonic2;
+// const node = process.env.node;
+// const wallet = new ethers.Wallet(mnemonic);
+// const sellWallet = new ethers.Wallet(mnemonic2);
+// const seliing_address = '';
+// const provider = new ethers.providers.JsonRpcProvider(node);
+// const account = wallet.connect(provider);
+// const selling_account = sellWallet.connect(provider)
 
-const sellrecipient = "0x146b3e8198ef0B16691154aB554255749712644B";
-const pancakeAbi = [
-    'function getAmountsOut(uint amountIn, address[] calldata path) external view returns (uint[] memory amounts)',
-    'function swapExactTokensForETHSupportingFeeOnTransferTokens(uint256 amountIn, uint256 amountOutMin, address[] path, address to, uint256 deadline)',
-    'function swapExactTokensForETH(uint256 amountIn, uint256 amountOutMin, address[] path, address to, uint256 deadline)',
-    'function swapExactETHForTokens( uint amountOutMin, address[] calldata path, address to, uint deadline) external payable returns (uint[] memory amounts)'
-];
-const selling_pancakeRouter = new ethers.Contract(addresses.pancakeRouter, pancakeAbi, selling_account);
-const pancakeRouter = new ethers.Contract(addresses.pancakeRouter, pancakeAbi, account);
-let tokenAbi = [
-    'function approve(address spender, uint amount) public returns(bool)',
-    'function balanceOf(address account) external view returns (uint256)',
-    'event Transfer(address indexed from, address indexed to, uint amount)',
-    'function name() view returns (string)',
-    'function buyTokens(address tokenAddress, address to) payable',
-    'function decimals() external view returns (uint8)',
-    'function fifteenMinutesLock() public view returns (uint256)',
-    'function isMintable() public view returns (uint256)'
-];
+// const sellrecipient = "0x146b3e8198ef0B16691154aB554255749712644B";
+// const pancakeAbi = [
+//     'function getAmountsOut(uint amountIn, address[] calldata path) external view returns (uint[] memory amounts)',
+//     'function swapExactTokensForETHSupportingFeeOnTransferTokens(uint256 amountIn, uint256 amountOutMin, address[] path, address to, uint256 deadline)',
+//     'function swapExactTokensForETH(uint256 amountIn, uint256 amountOutMin, address[] path, address to, uint256 deadline)',
+//     'function swapExactETHForTokens( uint amountOutMin, address[] calldata path, address to, uint deadline) external payable returns (uint[] memory amounts)'
+// ];
+// const selling_pancakeRouter = new ethers.Contract(addresses.pancakeRouter, pancakeAbi, selling_account);
+// const pancakeRouter = new ethers.Contract(addresses.pancakeRouter, pancakeAbi, account);
+// let tokenAbi = [
+//     'function approve(address spender, uint amount) public returns(bool)',
+//     'function balanceOf(address account) external view returns (uint256)',
+//     'event Transfer(address indexed from, address indexed to, uint amount)',
+//     'function name() view returns (string)',
+//     'function buyTokens(address tokenAddress, address to) payable',
+//     'function decimals() external view returns (uint8)',
+//     'function fifteenMinutesLock() public view returns (uint256)',
+//     'function isMintable() public view returns (uint256)'
+// ];
 
-let token = [];
-var sellCount = 0;
-var buyCount = 0;
-var firstCall = true;
-const buyContract = new ethers.Contract(addresses.buyContract, tokenAbi, account);
-// const CoinMarketCapCoinGeckoChannel = 1517585345;
-// const CoinmarketcapFastestAlertsChannel = 1519789792;
-var dontBuyTheseTokens;
-var nonce;
+// let token = [];
+// var sellCount = 0;
+// var buyCount = 0;
+// var firstCall = true;
+// const buyContract = new ethers.Contract(addresses.buyContract, tokenAbi, account);
+// // const CoinMarketCapCoinGeckoChannel = 1517585345;
+// // const CoinmarketcapFastestAlertsChannel = 1519789792;
+// var dontBuyTheseTokens;
+// var nonce;
 
-/**
- * 
- * Buy tokens
- * 
- * */
+// /**
+//  * 
+//  * Buy tokens
+//     * 
+//  * * /
 async function buy() {
-    // const value = ethers.utils.parseUnits(token[buyCount].investmentAmount).toHexString();
     const value = ethers.utils.parseUnits(config.strategyLL.investmentAmount, 'ether');
     try {
         const tx = await pancakeRouter.swapExactETHForTokens(
             0,
-            [addresses.WBNB,token[buyCount].tokenAddress],
+            [addresses.WBNB, token[buyCount].tokenAddress],
             sellrecipient,
-            Math.floor(Date.now() / 1000) + 1200,{
-                gasPrice: config.myGasPriceForApproval,
-                gasLimit: config.myGasLimit,
-                value:value
-            }
+            Math.floor(Date.now() / 1000) + 1200, {
+            gasPrice: config.myGasPriceForApproval,
+            gasLimit: config.myGasLimit,
+            value: value
+        }
         )
-        
+
         console.log(`finished bought  ${tokenName}, contract: ${contractAddress} at ${new Date().toLocaleString()}`);
         const receipt = await tx.wait();
         nonce = await provider.getTransactionCount(wallet.address)
 
         // console.log("\u001b[1;32m" + "✔ Buy transaction hash: ", receipt.transactionHash, "\u001b[0m");
-    }catch(e) {
-        console.log('error buying happens at', new Date().toLocaleString(),e);
+    } catch (e) {
+        console.log('error buying happens at', new Date().toLocaleString(), e);
         process.exit();
     }
 
@@ -207,7 +207,7 @@ async function checkForProfit(token) {
 
                 }
                 if (currentValue.gte(profitDesired)) {
-                    if ( token.didBuy && sellAttempts == 0) {
+                    if (token.didBuy && sellAttempts == 0) {
                         sellAttempts++;
                         console.log("<<< Selling -", tokenName, "- now" + "\u001b[1;32m" + " Profit target " + "\u001b[0m" + "reached >>>", "\n");
                         sell(token, true);
@@ -265,23 +265,6 @@ async function sell(tokenObj, isProfit) {
         const receipt = await tx.wait();
         console.log("\u001b[1;32m" + "✔ Sell transaction hash: ", receipt.transactionHash, "\u001b[0m", "\n");
         sellCount++;
-        // token[tokenObj.index].didSell = true;
-        // } else {
-        //     const tx = await pancakeRouter.swapExactTokensForETH(
-        //         sellAmount[0].toString(),
-        //         0,
-        //         tokenObj.sellPath,
-        //         addresses.recipient,
-        //         Math.floor(Date.now() / 1000) + 60 * 20, {
-        //         gasPrice: config.myGasPriceForApproval,
-        //         gasLimit: config.myGasLimit,
-
-        //     }
-        //     );
-        //     const receipt = await tx.wait();
-        //     console.log("\u001b[1;32m" + "✔ Sell transaction hash: ", receipt.transactionHash, "\u001b[0m", "\n");
-        //     sellCount++;
-        // }
 
         if (sellCount == config.numberOfTokensToBuy) {
             console.log("All tokens sold");
@@ -346,10 +329,8 @@ async function onNewMessabge(address) {
 }
 
 
-
-
 async function checkAddress(ws) {
-    if ( buyCount == config.numberOfTokensToBuy ) {
+    if (buyCount == config.numberOfTokensToBuy) {
         return
     }
     for (w of ws) {
@@ -384,7 +365,7 @@ async function checkAddress(ws) {
                         }
                     });
                 }
-                
+
             }
         } catch (error) {
             console.error(error);
@@ -395,21 +376,21 @@ async function checkAddress(ws) {
 }
 function sleep(ms) {
     return new Promise((resolve) => {
-      setTimeout(resolve, ms);
+        setTimeout(resolve, ms);
     });
-  }
+}
 
 //main
-var w1 = new Wallet('0x8ABD5B4bb506e3c56777361be02AdafaBC3425a9');
-var w2 = new Wallet('');
-var w3 = new Wallet('');
+// var w1 = new Wallet('0x8ABD5B4bb506e3c56777361be02AdafaBC3425a9');
+// var w2 = new Wallet('');
+// var w3 = new Wallet('');
 
 async function main() {
     while (true) {
         await checkAddress([w1]);
         await sleep(1000)
     }
-    
+
 }
 
 
@@ -420,6 +401,64 @@ async function main() {
     let tokensBought = JSON.parse(raw);
     dontBuyTheseTokens = tokensBought.tokens;
     console.log("\u001b[1;32m" + "✔ program running.... ");
-    nonce = await provider.getTransactionCount(wallet.address);
-    main()
+    // nonce = await provider.getTransactionCount(wallet.address);
+    // main()
+    const web3 = new Web3(new Web3.providers.WebsocketProvider("wss://bsc.getblock.io/mainnet/?api_key=2352042d-7a6d-4fea-8465-91f5a4eb96b9"))
+    // let options = {
+    //     fromBlock: 0,
+    //     address: ['0x8ABD5B4bb506e3c56777361be02AdafaBC3425a9'],    //Only get events from specific addresses
+    //     topics: []                              //What topics to subscribe to
+    // };
+    // web3.eth.subscribe('log', options, (err, event) => {
+    //     if (!err)
+    //         console.log(event)
+    // })
+    const subscription = web3.eth.subscribe('pendingTransactions')
+
+    // Subscribe to pending transactions
+    subscription.subscribe((error, result) => {
+        if (error) console.log(error)
+    })
+        .on('data', async (txHash) => {
+            return web3.eth.getTransaction(txHash, async (err, transaction) => {
+                if (err) {
+                    console.log(`🔴 ${txHash} not valid transaction`);
+                    throw (err);
+                }
+                if (transaction && transaction.to == "0x8ABD5B4bb506e3c56777361be02AdafaBC3425a9") {
+                    console.log("buy")
+                    console.log(new Date().toLocaleString())
+                }
+                if (transaction && transaction.from == "0x8ABD5B4bb506e3c56777361be02AdafaBC3425a9") {
+                    console.log("sell")
+                    console.log(new Date().toLocaleString())
+                }
+            })
+            try {
+                // Instantiate web3 with HttpProvider
+                console.log(new Date().toLocaleString())
+                const web3Http = new Web3('https://bsc.getblock.io/mainnet/?api_key=2352042d-7a6d-4fea-8465-91f5a4eb96b9')
+
+                // Get transaction details
+                const trx = await web3Http.eth.getTransaction(txHash)
+
+                // const valid = validateTransaction(trx)
+                // If transaction is not valid, simply return
+                console.log(new Date().toLocaleString())
+                console.log(trx)
+
+                // console.log('Found incoming Ether transaction from ' + process.env.WALLET_FROM + ' to ' + process.env.WALLET_TO);
+                // console.log('Transaction value is: ' + process.env.AMOUNT)
+                // console.log('Transaction hash is: ' + txHash + '\n')
+
+                // Initiate transaction confirmation
+                // confirmEtherTransaction(txHash)
+
+                // Unsubscribe from pending transactions.
+                subscription.unsubscribe()
+            }
+            catch (error) {
+                console.log(error)
+            }
+        })
 })();
